@@ -46,31 +46,42 @@ func main() {
 	fileScanner := bufio.NewScanner(file)
 	fileScanner.Split(bufio.ScanLines)
 
-	var tmp string
-	var data []string
+	ch := make(chan string)
+
+	go func() {
+		fmt.Println("spawned")
+		for {
+			tmp, ok := <-ch
+			if !ok {
+				return
+			}
+			data := strings.Split(tmp, ";")
+			data[1] = strings.Replace(data[1], ".", "", -1)
+			temp, err := strconv.Atoi(data[1])
+			if err != nil {
+				panic(err)
+			}
+			value, present := m[data[0]]
+			if !present {
+				m[data[0]] = measurement{max: temp, min: temp, sum: temp, count: 1}
+			} else {
+				if value.max < temp {
+					value.max = temp
+				}
+				if value.min > temp {
+					value.min = temp
+				}
+				value.sum += temp
+				value.count += 1
+				m[data[0]] = value
+			}
+		}
+	}()
 	for fileScanner.Scan() {
-		tmp = fileScanner.Text()
-		data = strings.Split(tmp, ";")
-		data[1] = strings.Replace(data[1], ".", "", -1)
-		temp, err := strconv.Atoi(data[1])
-		if err != nil {
-			panic(err)
-		}
-		value, present := m[data[0]]
-		if !present {
-			m[data[0]] = measurement{max: temp, min: temp, sum: temp, count: 1}
-		} else {
-			if value.max < temp {
-				value.max = temp
-			}
-			if value.min > temp {
-				value.min = temp
-			}
-			value.sum += temp
-			value.count += 1
-			m[data[0]] = value
-		}
+		ch <- fileScanner.Text()
 	}
+	fmt.Println("done")
+	close(ch)
 	fmt.Print(renderResults(m))
 
 }
